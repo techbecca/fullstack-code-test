@@ -11,7 +11,7 @@ public class Service {
   private String status = "UNKNOWN";
   private LocalDate localDate;
 
-  public Service(String name, String url) {
+  Service(String name, String url) {
     this.name = name;
     this.url = url;
     this.localDate = LocalDate.now();
