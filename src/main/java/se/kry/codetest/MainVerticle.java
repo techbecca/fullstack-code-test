@@ -62,6 +62,8 @@ public class MainVerticle extends AbstractVerticle {
           .map(service ->
               new JsonObject()
                   .put("name", service.getKey())
+                  //.put("url", service.getValue().getUrl())
+                  //.put("time_added", service.getValue().getFormattedDate())
                   .put("status", service.getValue()))
           .collect(Collectors.toList());
       req.response()
@@ -76,8 +78,10 @@ public class MainVerticle extends AbstractVerticle {
   private void addService(RoutingContext req) {
     JsonObject jsonBody = req.getBodyAsJson();
     final String url = jsonBody.getString("url");
+    final String name = jsonBody.getString("name");
+    final Service service = new Service(name, url);
     services.put(url, "UNKNOWN");
-    connector.query("INSERT OR IGNORE INTO service VALUES(\"" + url + "\");").setHandler(done -> {
+    connector.query("INSERT OR IGNORE INTO service VALUES(\"" + service.getUrl() + "\");").setHandler(done -> {
           if (done.succeeded()) {
             System.out.println("Value " + url + " inserted or already exists");
           } else {
@@ -89,7 +93,6 @@ public class MainVerticle extends AbstractVerticle {
         .putHeader("content-type", "text/plain")
         .end("OK");
   }
-
 }
 
 
