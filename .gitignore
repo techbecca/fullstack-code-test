@@ -5,4 +5,4 @@ out/
 gradle
 .vertx
 *.iml
-*.poller.db
+poller.db
