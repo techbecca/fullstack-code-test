@@ -5,9 +5,9 @@ import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
+import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.handler.StaticHandler;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -24,7 +24,7 @@ public class MainVerticle extends AbstractVerticle {
     connector = new DBConnector(vertx);
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
-    services.put("https://www.kry.se", "UNKNOWN");
+    getServicesFromDB();
     vertx.setPeriodic(1000 * 60, timerId -> poller.pollServices(services));
     setRoutes(router);
     vertx
@@ -40,7 +40,20 @@ public class MainVerticle extends AbstractVerticle {
         });
   }
 
-  private void setRoutes(Router router){
+  private void getServicesFromDB() {
+    connector.query("SELECT * FROM service;").setHandler(done -> {
+          if (done.succeeded()) {
+            for (JsonObject entries : done.result().getRows()) {
+              services.put(entries.getString("url"), "UNKNOWN");
+            }
+          } else {
+            done.cause().printStackTrace();
+          }
+        }
+    );
+  }
+
+  private void setRoutes(Router router) {
     router.route("/*").handler(StaticHandler.create());
     router.get("/service").handler(req -> {
       List<JsonObject> jsonServices = services
@@ -56,12 +69,25 @@ public class MainVerticle extends AbstractVerticle {
           .end(new JsonArray(jsonServices).encode());
     });
     router.post("/service").handler(req -> {
-      JsonObject jsonBody = req.getBodyAsJson();
-      services.put(jsonBody.getString("url"), "UNKNOWN");
-      req.response()
-          .putHeader("content-type", "text/plain")
-          .end("OK");
+      addService(req);
     });
+  }
+
+  private void addService(RoutingContext req) {
+    JsonObject jsonBody = req.getBodyAsJson();
+    final String url = jsonBody.getString("url");
+    services.put(url, "UNKNOWN");
+    connector.query("INSERT OR IGNORE INTO service VALUES(\"" + url + "\");").setHandler(done -> {
+          if (done.succeeded()) {
+            System.out.println("Value " + url + " inserted or already exists");
+          } else {
+            done.cause().printStackTrace();
+          }
+        }
+    );
+    req.response()
+        .putHeader("content-type", "text/plain")
+        .end("OK");
   }
 
 }
