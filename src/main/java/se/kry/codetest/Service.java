@@ -1,8 +1,10 @@
 package se.kry.codetest;
 
+import io.vertx.core.json.JsonObject;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.FormatStyle;
+
 
 public class Service {
 
@@ -48,5 +50,8 @@ public class Service {
     return localDate.format(dateTimeFormatter);
   }
 
+  public JsonObject toJson(){
+    return this.toJson();
+  }
 
 }
