@@ -25,7 +25,7 @@ public class MainVerticle extends AbstractVerticle {
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
     getServicesFromDB();
-    vertx.setPeriodic(1000 * 60, timerId -> poller.pollServices(services));
+    vertx.setPeriodic(1000 * 60, timerId -> poller.pollServices(services, connector));
     setRoutes(router);
     vertx
         .createHttpServer()
@@ -55,23 +55,37 @@ public class MainVerticle extends AbstractVerticle {
 
   private void setRoutes(Router router) {
     router.route("/*").handler(StaticHandler.create());
-    router.get("/service").handler(req -> {
+    final String path = "/service";
+    final String contentType = "content-type";
+    router.get(path).handler(req -> {
       List<JsonObject> jsonServices = services
           .entrySet()
           .stream()
           .map(service ->
               new JsonObject()
-                  .put("name", service.getKey())
+                  .put("contentType", service.getKey())
                   //.put("url", service.getValue().getUrl())
                   //.put("time_added", service.getValue().getFormattedDate())
                   .put("status", service.getValue()))
           .collect(Collectors.toList());
       req.response()
-          .putHeader("content-type", "application/json")
+          .putHeader(contentType, "application/json")
           .end(new JsonArray(jsonServices).encode());
     });
-    router.post("/service").handler(req -> {
-      addService(req);
+    router.post(path).handler(this::addService);
+    router.delete(path).handler(req -> {
+      JsonObject jsonBody = req.getBodyAsJson();
+      final String url = jsonBody.getString("url");
+      connector.query("DELETE FROM service WHERE url = \"" + url + "\";").setHandler(done -> {
+        if (done.succeeded()) {
+          System.out.println("Service " + url + " was deleted");
+        } else {
+          done.cause().printStackTrace();
+        }
+      });
+      req.response() //TODO: write erronous response if DB entry fails
+          .putHeader(contentType, "text/plain")
+          .end("OK");
     });
   }
 
@@ -81,19 +95,19 @@ public class MainVerticle extends AbstractVerticle {
     final String name = jsonBody.getString("name");
     final Service service = new Service(name, url);
     services.put(url, "UNKNOWN");
-    connector.query("INSERT OR IGNORE INTO service VALUES(\"" + service.getUrl() + "\");").setHandler(done -> {
+    connector.query("INSERT OR IGNORE INTO service VALUES( \""
+        + service.getUrl() + "\", \""
+        + service.getName() + "\", "
+        + service.getTimeStampMillis() + ");").setHandler(done -> {
           if (done.succeeded()) {
-            System.out.println("Value " + url + " inserted or already exists");
+            System.out.println("Service " + url + " inserted or already exists");
           } else {
             done.cause().printStackTrace();
           }
         }
     );
-    req.response()
+    req.response() //TODO: write erronous response if DB entry fails.
         .putHeader("content-type", "text/plain")
         .end("OK");
   }
 }
-
-
-
